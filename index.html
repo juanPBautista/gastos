@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Gastos">
+<meta name="theme-color" content="#F3F4F0">
+<title>Gastos</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<style>
+:root{--bg:#F3F4F0;--card:#fff;--ink:#16211B;--mute:#6B766F;--line:#E1E4DD;--ok:#16803C;--red:#C62828;--accent:#16211B;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101512;--card:#1A211C;--ink:#EEF2EC;--mute:#8E9A92;--line:#2A332D;--ok:#2FA45B;--red:#E0463F;--accent:#EEF2EC}}
+:root[data-theme="dark"]{--bg:#101512;--card:#1A211C;--ink:#EEF2EC;--mute:#8E9A92;--line:#2A332D;--ok:#2FA45B;--red:#E0463F;--accent:#EEF2EC}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font:16px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums;padding-bottom:84px}
+main{max-width:520px;margin:0 auto;padding:0 16px}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;gap:8px;overflow-x:auto;padding:12px 16px;margin:0 -16px;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;padding:9px 14px;border-radius:99px;border:1.5px solid var(--line);background:var(--card);font-weight:600;font-size:15px;white-space:nowrap}
+.tab.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+.hero{border-radius:24px;padding:22px 20px;color:#fff;margin-top:4px}
+.hero.ok{background:var(--ok)}.hero.red,.hero.over{background:var(--red)}
+.hero .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.hero h1{margin:0;font-size:22px}.hero .dates{opacity:.85;font-size:14px}
+.pen{background:rgba(255,255,255,.22);color:#fff;font-weight:700;font-size:14px;padding:8px 12px;border-radius:99px;flex:none}
+.big{font-size:56px;font-weight:800;letter-spacing:-1.5px;line-height:1.05;margin:14px 0 2px}
+.lbl{font-size:13px;opacity:.85}
+.row2{display:flex;gap:24px;margin-top:14px}.row2 b{display:block;font-size:20px}
+.badge{display:inline-block;margin-top:16px;background:rgba(255,255,255,.2);padding:7px 14px;border-radius:99px;font-weight:800;font-size:15px}
+.bar{position:relative;height:12px;background:rgba(255,255,255,.28);border-radius:9px;margin-top:16px;overflow:visible}
+.bar i{display:block;height:100%;background:#fff;border-radius:9px}
+.bar u{position:absolute;top:-4px;width:2px;height:20px;background:#fff;opacity:.9}
+.hint{margin:8px 0 0;font-size:14px;opacity:.95}
+.btn{display:block;width:100%;padding:16px;border-radius:16px;background:var(--accent);color:var(--bg);font-weight:700;font-size:17px;margin:14px 0}
+.btn.sec{background:var(--card);color:var(--ink);border:1.5px solid var(--line);font-size:15px;padding:13px;margin:8px 0}
+.btn.del{background:none;color:var(--red);border:1.5px solid var(--red)}
+.btn[disabled]{opacity:.4}
+.list{background:var(--card);border-radius:18px;overflow:hidden}
+.ex{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:13px 16px;border-bottom:1px solid var(--line)}
+.ex:last-child{border:0}
+.ex .d{width:46px;font-size:13px;color:var(--mute)}.ex .m{flex:1;min-width:0}
+.ex .m b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ex .m span{font-size:13px;color:var(--mute)}.ex .a{font-weight:700}
+.empty{padding:28px 16px;text-align:center;color:var(--mute)}
+h2{font-size:15px;margin:22px 4px 8px;color:var(--mute);font-weight:600}
+.lock{background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:11px 14px;margin-top:12px;font-size:14px;color:var(--mute)}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom,0px);z-index:6}
+nav button{flex:1;padding:12px 4px 10px;font-size:12px;color:var(--mute);font-weight:600}
+nav button span{display:block;font-size:22px}
+nav button.on{color:var(--ink)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:right;color:var(--mute);font-weight:600;padding:8px 6px}td{padding:12px 6px;text-align:right;border-top:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left;padding-left:14px}th:last-child,td:last-child{text-align:center;padding-right:14px}
+tr.go{cursor:pointer}
+.scroll{overflow-x:auto;background:var(--card);border-radius:18px}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--bg);width:100%;max-width:520px;max-height:92%;overflow:auto;border-radius:24px 24px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px))}
+.sheet h3{margin:0 0 12px;font-size:20px}
+label{display:block;font-size:13px;color:var(--mute);font-weight:600;margin:12px 0 5px}
+input,select,textarea{width:100%;font:inherit;font-size:17px;padding:13px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);appearance:none;-webkit-appearance:none;min-height:50px}
+.amt{font-size:32px;font-weight:800}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.err{color:var(--red);font-size:14px;margin-top:8px}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<nav id="nav"></nav>
+<script>
+const $=s=>document.querySelector(s);
+const MON=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const MONF=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const CATS=['Comida','Despensa','Gasolina','Transporte','Casa','Bebé','Salud','Mascotas','Auto','Entretenimiento','Servicios','Compras','Otros'];
+const nf=new Intl.NumberFormat('es-MX');
+const money=n=>(n<0?'-':'')+'$'+nf.format(Math.abs(Math.round(n*100)/100));
+const uid=()=>Math.random().toString(36).slice(2,10);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pd=s=>{const[a,b,c]=s.split('-').map(Number);return new Date(a,b-1,c)};
+const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const fd=(s,y)=>{const d=pd(s);return d.getDate()+' '+MON[d.getMonth()]+(y?' '+d.getFullYear():'')};
+const today=()=>iso(new Date());
+
+/* ---------- Persistencia (IndexedDB) ---------- */
+let S,view='period';
+const dbp=new Promise((res,rej)=>{const r=indexedDB.open('gastos-db',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+async function load(){try{const db=await dbp;return await new Promise(r=>{const q=db.transaction('kv').objectStore('kv').get('state');q.onsuccess=()=>r(q.result);q.onerror=()=>r(null)})}catch(e){return null}}
+async function save(){try{const db=await dbp;db.transaction('kv','readwrite').objectStore('kv').put(JSON.parse(JSON.stringify(S)),'state')}catch(e){}}
+function seed(){
+  const id=uid();
+  return{activeId:id,defaults:{budget:40000,threshold:3000},periods:[{id,name:'Noviembre 2026',start:'2026-10-16',end:'2026-11-15',budget:40000,threshold:3000,closed:false,sample:true,
+  expenses:[['2026-11-03','Gasolina','Gasolina',900],['2026-11-04','Despensa','Despensa',1000],['2026-11-05','AT&T','Servicios',1690],['2026-11-06','Cine','Entretenimiento',807]].map(([date,desc,cat,amount])=>({id:uid(),date,desc,cat,amount,note:''}))}]};
+}
+
+/* ---------- Cálculos ---------- */
+const act=()=>S.periods.find(p=>p.id===S.activeId)||S.periods[0];
+function stat(p){
+  const spent=p.expenses.reduce((a,e)=>a+e.amount,0),avail=p.budget-spent;
+  const st=avail<0?'over':avail<=p.threshold?'red':'ok';
+  return{spent,avail,st,pct:p.budget>0?spent/p.budget*100:(spent>0?100:0)};
+}
+const dot=st=>st==='ok'?'🟢':'🔴';
+
+/* ---------- Render ---------- */
+function render(){
+  const app=$('#app');
+  $('#nav').innerHTML=[['period','💵','Periodo'],['hist','📊','Histórico'],['set','⚙️','Ajustes']].map(([k,i,t])=>`<button class="${view===k?'on':''}" onclick="go('${k}')"><span>${i}</span>${t}</button>`).join('');
+  if(view==='hist')return app.innerHTML=histHTML();
+  if(view==='set')return app.innerHTML=setHTML();
+  const tabs=`<div class="tabs" id="tabs">${S.periods.map(p=>`<button class="tab ${p.id===S.activeId?'on':''}" onclick="pick('${p.id}')">${esc(p.name)}${p.closed?' 🔒':' '+dot(stat(p).st)}</button>`).join('')}<button class="tab" onclick="periodForm()" aria-label="Nuevo periodo">+</button></div>`;
+  const p=act();
+  if(!p)return app.innerHTML=tabs+`<div class="empty" style="margin-top:40px"><p>Aún no tienes periodos.</p><button class="btn" onclick="periodForm()">Crear primer periodo</button></div>`;
+  const s=stat(p),ex=[...p.expenses].sort((a,b)=>b.date.localeCompare(a.date)||0);
+  const label={ok:'OK',red:'CUIDADO',over:'PRESUPUESTO EXCEDIDO'}[s.st];
+  const hint=s.st==='ok'?`Faltan ${money(s.avail-p.threshold)} para llegar al umbral rojo (${money(p.threshold)}).`:s.st==='red'?`Quedan solo ${money(s.avail)}. Umbral: ${money(p.threshold)}.`:`Te pasaste por ${money(-s.avail)}.`;
+  const tm=p.budget>0?Math.min(100,Math.max(0,(p.budget-p.threshold)/p.budget*100)):0;
+  app.innerHTML=tabs+`
+  <section class="hero ${s.st}">
+    <div class="top"><div><h1>${esc(p.name)}${p.closed?' 🔒':''}</h1><div class="dates">${fd(p.start)} → ${fd(p.end,1)}</div></div><button class="pen" onclick="periodForm('${p.id}')" aria-label="Editar periodo">✏️ Editar</button></div>
+    <div class="lbl" style="margin-top:14px">DISPONIBLE</div>
+    <div class="big">${money(s.avail)}</div>
+    <div class="row2"><div><span class="lbl">PRESUPUESTO</span><b>${money(p.budget)}</b></div><div><span class="lbl">GASTADO</span><b>${money(s.spent)}</b></div></div>
+    <div class="badge">${dot(s.st)} ${label}</div>
+    <div class="bar"><i style="width:${Math.min(100,s.pct)}%"></i><u style="left:${tm}%"></u></div>
+    <div class="lbl" style="margin-top:6px">${s.pct.toFixed(1)}% gastado</div>
+    <p class="hint">${hint}</p>
+  </section>
+  ${p.closed?'<div class="lock">🔒 Periodo cerrado. Los gastos están bloqueados.</div>':'<button class="btn" onclick="expForm()">+ Agregar gasto</button>'}
+  <h2>Gastos (${ex.length})</h2>
+  <div class="list">${ex.length?ex.map(e=>`<button class="ex" ${p.closed?'disabled':''} onclick="expForm('${e.id}')"><span class="d">${fd(e.date)}</span><span class="m"><b>${esc(e.desc)}</b><span>${esc(e.cat)}${e.note?' · '+esc(e.note):''}</span></span><span class="a">${money(e.amount)}</span></button>`).join(''):'<div class="empty">Sin gastos. Toca “Agregar gasto” para empezar.</div>'}</div>
+  <h2>Periodo</h2>
+  <button class="btn sec" onclick="periodForm('${p.id}')">Editar nombre, fechas y presupuesto</button>
+  <button class="btn sec" onclick="toggleClose()">${p.closed?'Reabrir periodo':'Cerrar periodo'}</button>`;
+  const on=document.querySelector('.tab.on');if(on)on.scrollIntoView({inline:'center',block:'nearest'});
+}
+function histHTML(){
+  const rows=S.periods.map(p=>{const s=stat(p);return`<tr class="go" onclick="pick('${p.id}')"><td>${esc(p.name)}${p.closed?' 🔒':''}</td><td>${money(p.budget)}</td><td>${money(s.spent)}</td><td>${money(s.avail)}</td><td>${s.st==='ok'?'🟢':'🔴'}</td></tr>`}).join('');
+  return`<h2 style="margin-top:20px">Histórico</h2><div class="scroll"><table><tr><th>Periodo</th><th>Presup.</th><th>Gastado</th><th>Disp.</th><th></th></tr>${rows||'<tr><td colspan="5" class="empty">Sin periodos</td></tr>'}</table></div>`;
+}
+function setHTML(){
+  const hasSample=S.periods.some(p=>p.sample);
+  return`<h2 style="margin-top:20px">Valores para periodos nuevos</h2>
+  <label>Presupuesto</label><input id="dB" type="number" inputmode="decimal" value="${S.defaults.budget}" onchange="setDef()">
+  <label>Umbral de alerta (rojo cuando quede esto o menos)</label><input id="dT" type="number" inputmode="decimal" value="${S.defaults.threshold}" onchange="setDef()">
+  <h2>Datos</h2>
+  <p style="margin:0 4px 10px;color:var(--mute);font-size:14px">Todo se guarda solo en este dispositivo (IndexedDB). No se pide información bancaria.</p>
+  ${hasSample?'<button class="btn sec del btn del" onclick="delSample()">Eliminar datos de ejemplo</button>':''}
+  <p style="margin:18px 4px;color:var(--mute);font-size:13px">Para instalar en iPhone: Safari → Compartir → Agregar a pantalla de inicio.</p>`;
+}
+
+/* ---------- Acciones ---------- */
+function go(v){view=v;render();scrollTo(0,0)}
+function pick(id){if(id===S.activeId&&view==='period')return periodForm(id);S.activeId=id;view='period';save();render();scrollTo(0,0)}
+function setDef(){S.defaults.budget=+$('#dB').value||0;S.defaults.threshold=+$('#dT').value||0;save()}
+function ask(msg,ok,label){sheet('<h3>'+esc(msg)+'</h3><button class="btn" id="okB" style="background:var(--red);color:#fff">'+(label||'Confirmar')+'</button><button class="btn sec" onclick="closeSheet()">Cancelar</button>');$('#okB').onclick=()=>{closeSheet();ok()}}
+function toggleClose(){const p=act();
+  ask(p.closed?'¿Reabrir este periodo para editarlo?':'¿Cerrar "'+p.name+'"? Quedará bloqueado para evitar cambios accidentales.',()=>{p.closed=!p.closed;save();render()},p.closed?'Reabrir':'Cerrar periodo')}
+function delSample(){ask('¿Eliminar los datos de ejemplo y empezar desde cero?',()=>{
+  S.periods=S.periods.filter(p=>!p.sample);S.activeId=S.periods.length?S.periods[S.periods.length-1].id:null;save();view='period';render()},'Eliminar')}
+
+function sheet(html){closeSheet();const o=document.createElement('div');o.className='ov';o.id='ov';o.innerHTML='<div class="sheet">'+html+'</div>';
+  o.addEventListener('click',e=>{if(e.target===o)closeSheet()});document.body.appendChild(o)}
+function closeSheet(){const o=$('#ov');if(o)o.remove()}
+
+function expForm(id){
+  const p=act(),e=id?p.expenses.find(x=>x.id===id):null;
+  const last=localStorage.getItem('lastCat')||'Comida';
+  sheet(`<h3>${e?'Editar gasto':'Agregar gasto'}</h3>
+  <label>Monto</label><input id="fA" class="amt" type="number" inputmode="decimal" step="0.01" placeholder="$0" value="${e?e.amount:''}">
+  <label>Descripción</label><input id="fD" placeholder="Ej. Gasolina" value="${esc(e?e.desc:'')}" autocapitalize="sentences">
+  <div class="g2"><div><label>Categoría</label><select id="fC">${CATS.map(c=>`<option ${c===(e?e.cat:last)?'selected':''}>${c}</option>`).join('')}</select></div>
+  <div><label>Fecha</label><input id="fF" type="date" value="${e?e.date:today()}"></div></div>
+  <label>Nota (opcional)</label><input id="fN" value="${esc(e?e.note:'')}">
+  <div class="err" id="er"></div>
+  <button class="btn" onclick="saveExp('${id||''}')">Guardar</button>
+  ${e?`<button class="btn sec del" onclick="delExp('${id}')">Eliminar gasto</button>`:''}
+  <button class="btn sec" onclick="closeSheet()">Cancelar</button>`);
+  if(!e)setTimeout(()=>$('#fA').focus(),80);
+}
+function saveExp(id){
+  const p=act(),amount=parseFloat($('#fA').value),cat=$('#fC').value,date=$('#fF').value;
+  if(!(amount>0))return $('#er').textContent='Escribe un monto mayor a 0.';
+  if(!date)return $('#er').textContent='Elige una fecha.';
+  const d={date,cat,amount,desc:$('#fD').value.trim()||cat,note:$('#fN').value.trim()};
+  if(id)Object.assign(p.expenses.find(x=>x.id===id),d);else p.expenses.push({id:uid(),...d});
+  try{localStorage.setItem('lastCat',cat)}catch(e){}
+  save();closeSheet();render();
+}
+function delExp(id){ask('¿Eliminar este gasto?',()=>{const p=act();p.expenses=p.expenses.filter(x=>x.id!==id);save();render()},'Eliminar')}
+
+function periodForm(id){
+  const e=id?S.periods.find(p=>p.id===id):null;let v;
+  if(e)v=e;else{
+    const last=S.periods[S.periods.length-1];
+    let st=last?new Date(pd(last.end).getTime()+864e5):new Date();
+    if(last)st=new Date(pd(last.end).getFullYear(),pd(last.end).getMonth(),pd(last.end).getDate()+1);
+    const en=new Date(st.getFullYear(),st.getMonth()+1,st.getDate()-1);
+    v={name:MONF[en.getMonth()]+' '+en.getFullYear(),start:iso(st),end:iso(en),budget:S.defaults.budget,threshold:S.defaults.threshold};
+  }
+  sheet(`<h3>${e?'Editar periodo':'Nuevo periodo'}</h3>
+  <label>Nombre</label><input id="pN" value="${esc(v.name)}">
+  <div class="g2"><div><label>Fecha inicial</label><input id="pS" type="date" value="${v.start}"></div><div><label>Fecha final</label><input id="pE" type="date" value="${v.end}"></div></div>
+  <div class="g2"><div><label>Presupuesto</label><input id="pB" type="number" inputmode="decimal" value="${v.budget}"></div><div><label>Umbral de alerta</label><input id="pT" type="number" inputmode="decimal" value="${v.threshold}"></div></div>
+  <div class="err" id="er"></div>
+  <button class="btn" onclick="savePeriod('${id||''}')">${e?'Guardar cambios':'Crear periodo'}</button>
+  ${e?`<button class="btn sec del" onclick="delPeriod('${id}')">Eliminar periodo</button>`:''}
+  <button class="btn sec" onclick="closeSheet()">Cancelar</button>`);
+}
+function savePeriod(id){
+  const d={name:$('#pN').value.trim(),start:$('#pS').value,end:$('#pE').value,budget:parseFloat($('#pB').value),threshold:parseFloat($('#pT').value)};
+  if(!d.name)return $('#er').textContent='Escribe un nombre.';
+  if(!d.start||!d.end)return $('#er').textContent='Elige las dos fechas.';
+  if(d.end<d.start)return $('#er').textContent='La fecha final debe ser posterior a la inicial.';
+  if(!(d.budget>=0)||!(d.threshold>=0))return $('#er').textContent='Presupuesto y umbral deben ser números válidos.';
+  if(id)Object.assign(S.periods.find(p=>p.id===id),d);
+  else{const n={id:uid(),closed:false,expenses:[],...d};S.periods.push(n);S.activeId=n.id;S.defaults.budget=d.budget;S.defaults.threshold=d.threshold}
+  save();closeSheet();view='period';render();
+}
+function delPeriod(id){const p=S.periods.find(x=>x.id===id);
+  ask('¿Eliminar "'+p.name+'" y sus '+p.expenses.length+' gastos? No se puede deshacer.',()=>{
+  S.periods=S.periods.filter(x=>x.id!==id);S.activeId=S.periods.length?S.periods[S.periods.length-1].id:null;save();render()},'Eliminar')}
+
+/* ---------- PWA: service worker ---------- */
+if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0)addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+
+/* ---------- Inicio ---------- */
+(async()=>{
+  S=await load();
+  if(!S){S=seed();await save()}
+  if(!S.periods.some(p=>p.id===S.activeId))S.activeId=S.periods.length?S.periods[S.periods.length-1].id:null;
+  render();
+})();
+</script>
+</body>
+</html>
