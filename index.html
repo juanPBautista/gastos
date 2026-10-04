@@ -93,7 +93,7 @@ let S,view='period';
 const dbp=new Promise((res,rej)=>{const r=indexedDB.open('gastos-db',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 async function load(){try{const db=await dbp;return await new Promise(r=>{const q=db.transaction('kv').objectStore('kv').get('state');q.onsuccess=()=>r(q.result);q.onerror=()=>r(null)})}catch(e){return null}}
 async function save(){try{const db=await dbp;db.transaction('kv','readwrite').objectStore('kv').put(JSON.parse(JSON.stringify(S)),'state')}catch(e){}}
-function seed(){return{activeId:null,defaults:{budget:40000,threshold:3000},periods:[]}}
+function seed(){return{activeId:null,defaults:{budget:40000,threshold:3000},periods:[],cats:[],fixed:[]}}
 
 /* ---------- Cálculos ---------- */
 const act=()=>S.periods.find(p=>p.id===S.activeId)||S.periods[0];
@@ -145,6 +145,7 @@ function setHTML(){
   return`<h2 style="margin-top:20px">Valores para periodos nuevos</h2>
   <label>Presupuesto</label><input id="dB" type="number" inputmode="decimal" value="${S.defaults.budget}" onchange="setDef()">
   <label>Umbral de alerta (rojo cuando quede esto o menos)</label><input id="dT" type="number" inputmode="decimal" value="${S.defaults.threshold}" onchange="setDef()">
+  ${fixHTML()}${catsHTML()}
   <h2>Respaldo</h2>
   <p style="margin:0 4px 10px;color:var(--mute);font-size:14px">${lastBk()}</p>
   <button class="btn sec" onclick="exportData()">Exportar respaldo</button>
@@ -170,13 +171,14 @@ function sheet(html){closeSheet();const o=document.createElement('div');o.classN
 function closeSheet(){const o=$('#ov');if(o)o.remove()}
 
 function expForm(id){
-  const p=act(),e=id?p.expenses.find(x=>x.id===id):null;
+  const p=act(),e=id?p.expenses.find(x=>x.id===id):null;EDIT=!!e;HM=descHist();
   const last=localStorage.getItem('lastCat')||'Comida';
   sheet(`<h3>${e?'Editar gasto':'Agregar gasto'}</h3>
   <label>Monto</label><input id="fA" class="amt" type="number" inputmode="decimal" step="0.01" placeholder="$0" value="${e?e.amount:''}">
-  <label>Descripción</label><input id="fD" placeholder="Ej. Gasolina" value="${esc(e?e.desc:'')}" autocapitalize="sentences">
-  <div class="g2"><div><label>Categoría</label><select id="fC">${CATS.map(c=>`<option ${c===(e?e.cat:last)?'selected':''}>${c}</option>`).join('')}</select></div>
+  <label>Descripción</label><input id="fD" list="dl" autocomplete="off" oninput="sugg()" placeholder="Ej. Gasolina" value="${esc(e?e.desc:'')}" autocapitalize="sentences"><datalist id="dl">${[...HM.values()].slice(0,60).map(x=>`<option value="${esc(x.desc)}">`).join('')}</datalist>
+  <div class="g2"><div><label>Categoría</label><select id="fC" onchange="catChange(this)">${allCats().map(c=>`<option value="${esc(c)}" ${c===(e?e.cat:last)?'selected':''}>${esc(c)}</option>`).join('')}<option value="__new">＋ Nueva categoría…</option></select></div>
   <div><label>Fecha</label><input id="fF" type="date" value="${e?e.date:today()}"></div></div>
+  <input id="fCN" placeholder="Nombre de la nueva categoría" style="display:none;margin-top:10px" autocapitalize="sentences">
   <label>Nota (opcional)</label><input id="fN" value="${esc(e?e.note:'')}">
   <div class="err" id="er"></div>
   <button class="btn" onclick="saveExp('${id||''}')">Guardar</button>
@@ -185,9 +187,11 @@ function expForm(id){
   if(!e)setTimeout(()=>$('#fA').focus(),80);
 }
 function saveExp(id){
-  const p=act(),amount=parseFloat($('#fA').value),cat=$('#fC').value,date=$('#fF').value;
+  const p=act(),amount=parseFloat($('#fA').value),date=$('#fF').value;let cat=$('#fC').value;
   if(!(amount>0))return $('#er').textContent='Escribe un monto mayor a 0.';
   if(!date)return $('#er').textContent='Elige una fecha.';
+  if(cat==='__new'){cat=$('#fCN').value.trim();if(!cat)return $('#er').textContent='Escribe el nombre de la nueva categoría.';
+    const ex=allCats().find(x=>x.toLowerCase()===cat.toLowerCase());if(ex)cat=ex;else S.cats.push(cat)}
   const d={date,cat,amount,desc:$('#fD').value.trim()||cat,note:$('#fN').value.trim()};
   if(id)Object.assign(p.expenses.find(x=>x.id===id),d);else p.expenses.push({id:uid(),...d});
   try{localStorage.setItem('lastCat',cat)}catch(e){}
@@ -208,6 +212,7 @@ function periodForm(id){
   <label>Nombre</label><input id="pN" value="${esc(v.name)}">
   <div class="g2"><div><label>Fecha inicial</label><input id="pS" type="date" value="${v.start}"></div><div><label>Fecha final</label><input id="pE" type="date" value="${v.end}"></div></div>
   <div class="g2"><div><label>Presupuesto</label><input id="pB" type="number" inputmode="decimal" value="${v.budget}"></div><div><label>Umbral de alerta</label><input id="pT" type="number" inputmode="decimal" value="${v.threshold}"></div></div>
+  ${e?'':fixChk()}
   <div class="err" id="er"></div>
   <button class="btn" onclick="savePeriod('${id||''}')">${e?'Guardar cambios':'Crear periodo'}</button>
   ${e?`<button class="btn sec del" onclick="delPeriod('${id}')">Eliminar periodo</button>`:''}
@@ -220,13 +225,53 @@ function savePeriod(id){
   if(d.end<d.start)return $('#er').textContent='La fecha final debe ser posterior a la inicial.';
   if(!(d.budget>=0)||!(d.threshold>=0))return $('#er').textContent='Presupuesto y umbral deben ser números válidos.';
   if(id)Object.assign(S.periods.find(p=>p.id===id),d);
-  else{const n={id:uid(),closed:false,expenses:[],...d};S.periods.push(n);S.activeId=n.id;S.defaults.budget=d.budget;S.defaults.threshold=d.threshold}
+  else{const n={id:uid(),closed:false,expenses:[],...d};
+    if($('#pF')&&$('#pF').checked)n.expenses=S.fixed.map(f=>({id:uid(),date:fixDate(f.day,d.start,d.end),desc:f.desc,cat:f.cat,amount:f.amount,note:''}));S.periods.push(n);S.activeId=n.id;S.defaults.budget=d.budget;S.defaults.threshold=d.threshold}
   save();closeSheet();view='period';render();
 }
 function delPeriod(id){const p=S.periods.find(x=>x.id===id);
   ask('¿Eliminar "'+p.name+'" y sus '+p.expenses.length+' gastos? No se puede deshacer.',()=>{
   S.periods=S.periods.filter(x=>x.id!==id);S.activeId=S.periods.length?S.periods[S.periods.length-1].id:null;save();render()},'Eliminar')}
 
+
+/* ---------- Categorías y sugerencias ---------- */
+let HM=new Map(),EDIT=false;
+function allCats(){const u=[...CATS];[...S.cats,...S.periods.flatMap(p=>p.expenses.map(e=>e.cat))].forEach(c=>{if(c&&!u.some(x=>x.toLowerCase()===c.toLowerCase()))u.push(c)});return u}
+function descHist(){const m=new Map();S.periods.flatMap(p=>p.expenses).sort((a,b)=>b.date.localeCompare(a.date)).forEach(e=>{const k=e.desc.trim().toLowerCase();if(k&&!m.has(k))m.set(k,e)});return m}
+function catChange(sel){sel.dataset.t=1;const n=$('#fCN'),nw=sel.value==='__new';n.style.display=nw?'block':'none';if(nw)n.focus()}
+function sugg(){if(EDIT)return;const e=HM.get($('#fD').value.trim().toLowerCase());if(!e)return;
+  const c=$('#fC');if(!c.dataset.t&&[...c.options].some(o=>o.value===e.cat))c.value=e.cat;
+  const a=$('#fA');if(!a.value)a.value=e.amount}
+function catsHTML(){if(!S.cats.length)return'';const used=new Set(S.periods.flatMap(p=>p.expenses.map(e=>e.cat)));
+  return'<h2>Categorías propias</h2><div class="list">'+S.cats.map((c,i)=>`<div class="ex"><span class="m"><b>${esc(c)}</b></span>${used.has(c)?'<span class="d" style="width:auto">en uso</span>':`<button class="a" style="color:var(--red)" onclick="delCat(${i})">Quitar</button>`}</div>`).join('')+'</div>'}
+function delCat(i){S.cats.splice(i,1);save();render()}
+
+/* ---------- Gastos fijos ---------- */
+function fixDate(day,start,end){let d=pd(start);const e=pd(end);day=Math.min(31,Math.max(1,day||1));
+  while(d<=e){if(d.getDate()===day)return iso(d);d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1)}return end}
+function fixChk(){if(!S.fixed.length)return'';const t=S.fixed.reduce((a,f)=>a+f.amount,0);
+  return`<label style="display:flex;gap:12px;align-items:center;color:var(--ink);font-size:15px;margin-top:16px"><input id="pF" type="checkbox" checked style="width:24px;height:24px;min-height:24px;padding:0;appearance:auto;-webkit-appearance:checkbox">Cargar ${S.fixed.length} gastos fijos (${money(t)})</label>`}
+function fixHTML(){const t=S.fixed.reduce((a,f)=>a+f.amount,0);
+  return'<h2>Gastos fijos</h2><p style="margin:0 4px 10px;color:var(--mute);font-size:14px">Se cargan solos al crear un periodo nuevo. Después puedes editarlos en ese periodo sin cambiar el original.</p>'
+  +(S.fixed.length?'<div class="list">'+S.fixed.map(f=>`<button class="ex" onclick="fixForm('${f.id}')"><span class="d" style="width:54px">día ${f.day}</span><span class="m"><b>${esc(f.desc)}</b><span>${esc(f.cat)}</span></span><span class="a">${money(f.amount)}</span></button>`).join('')+'</div><p style="margin:8px 4px;color:var(--mute);font-size:14px">Total fijo: '+money(t)+'</p>':'')
+  +'<button class="btn sec" onclick="fixForm()">+ Agregar gasto fijo</button>'}
+function fixForm(id){const f=id?S.fixed.find(x=>x.id===id):null;
+  sheet(`<h3>${f?'Editar gasto fijo':'Nuevo gasto fijo'}</h3>
+  <label>Monto</label><input id="xA" class="amt" type="number" inputmode="decimal" step="0.01" placeholder="$0" value="${f?f.amount:''}">
+  <label>Descripción</label><input id="xD" placeholder="Ej. Renta" value="${esc(f?f.desc:'')}" autocapitalize="sentences">
+  <div class="g2"><div><label>Categoría</label><select id="xC">${allCats().map(c=>`<option value="${esc(c)}" ${c===(f?f.cat:'Servicios')?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+  <div><label>Día del mes</label><input id="xF" type="number" inputmode="numeric" min="1" max="31" value="${f?f.day:1}"></div></div>
+  <div class="err" id="er"></div>
+  <button class="btn" onclick="saveFix('${id||''}')">Guardar</button>
+  ${f?`<button class="btn sec del" onclick="delFix('${id}')">Eliminar gasto fijo</button>`:''}
+  <button class="btn sec" onclick="closeSheet()">Cancelar</button>`)}
+function saveFix(id){const amount=parseFloat($('#xA').value),day=parseInt($('#xF').value),cat=$('#xC').value;
+  if(!(amount>0))return $('#er').textContent='Escribe un monto mayor a 0.';
+  if(!(day>=1&&day<=31))return $('#er').textContent='El día debe estar entre 1 y 31.';
+  const d={amount,day,cat,desc:$('#xD').value.trim()||cat};
+  if(id)Object.assign(S.fixed.find(x=>x.id===id),d);else S.fixed.push({id:uid(),...d});
+  save();closeSheet();render()}
+function delFix(id){ask('¿Eliminar este gasto fijo? Los periodos ya creados no cambian.',()=>{S.fixed=S.fixed.filter(x=>x.id!==id);save();render()},'Eliminar')}
 
 /* ---------- Respaldo ---------- */
 const getBk=()=>{try{return+localStorage.getItem('lastBackup')||0}catch(e){return 0}};
@@ -250,7 +295,7 @@ function importData(inp){
     if(!ok)return alert('El archivo no es un respaldo válido.');
     const n=d.periods.length,g=d.periods.reduce((a,p)=>a+p.expenses.length,0);
     ask('¿Reemplazar los datos actuales con el respaldo? ('+n+' periodos, '+g+' gastos)',()=>{
-      S={activeId:d.activeId,defaults:d.defaults||{budget:40000,threshold:3000},periods:d.periods};
+      S={activeId:d.activeId,defaults:d.defaults||{budget:40000,threshold:3000},periods:d.periods,cats:Array.isArray(d.cats)?d.cats:[],fixed:Array.isArray(d.fixed)?d.fixed:[]};
       if(!S.periods.some(p=>p.id===S.activeId))S.activeId=S.periods.length?S.periods[S.periods.length-1].id:null;
       save();view='period';render()},'Restaurar');
   }).catch(()=>alert('No se pudo leer el archivo.'));
@@ -264,6 +309,7 @@ if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0)addEventL
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
   S=await load();
   if(!S){S=seed();await save()}
+  S.cats=S.cats||[];S.fixed=S.fixed||[];
   if(!S.periods.some(p=>p.id===S.activeId))S.activeId=S.periods.length?S.periods[S.periods.length-1].id:null;
   render();
 })();
