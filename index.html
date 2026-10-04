@@ -93,11 +93,7 @@ let S,view='period';
 const dbp=new Promise((res,rej)=>{const r=indexedDB.open('gastos-db',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 async function load(){try{const db=await dbp;return await new Promise(r=>{const q=db.transaction('kv').objectStore('kv').get('state');q.onsuccess=()=>r(q.result);q.onerror=()=>r(null)})}catch(e){return null}}
 async function save(){try{const db=await dbp;db.transaction('kv','readwrite').objectStore('kv').put(JSON.parse(JSON.stringify(S)),'state')}catch(e){}}
-function seed(){
-  const id=uid();
-  return{activeId:id,defaults:{budget:40000,threshold:3000},periods:[{id,name:'Noviembre 2026',start:'2026-10-16',end:'2026-11-15',budget:40000,threshold:3000,closed:false,sample:true,
-  expenses:[['2026-11-03','Gasolina','Gasolina',900],['2026-11-04','Despensa','Despensa',1000],['2026-11-05','AT&T','Servicios',1690],['2026-11-06','Cine','Entretenimiento',807]].map(([date,desc,cat,amount])=>({id:uid(),date,desc,cat,amount,note:''}))}]};
-}
+function seed(){return{activeId:null,defaults:{budget:40000,threshold:3000},periods:[]}}
 
 /* ---------- Cálculos ---------- */
 const act=()=>S.periods.find(p=>p.id===S.activeId)||S.periods[0];
@@ -116,7 +112,7 @@ function render(){
   if(view==='set')return app.innerHTML=setHTML();
   const tabs=`<div class="tabs" id="tabs">${S.periods.map(p=>`<button class="tab ${p.id===S.activeId?'on':''}" onclick="pick('${p.id}')">${esc(p.name)}${p.closed?' 🔒':' '+dot(stat(p).st)}</button>`).join('')}<button class="tab" onclick="periodForm()" aria-label="Nuevo periodo">+</button></div>`;
   const p=act();
-  if(!p)return app.innerHTML=tabs+`<div class="empty" style="margin-top:40px"><p>Aún no tienes periodos.</p><button class="btn" onclick="periodForm()">Crear primer periodo</button></div>`;
+  if(!p)return app.innerHTML=tabs+`<div class="empty" style="margin-top:40px"><p>Aún no tienes periodos.</p><button class="btn" onclick="periodForm()">Crear primer periodo</button>${importBtn()}</div>`;
   const s=stat(p),ex=[...p.expenses].sort((a,b)=>b.date.localeCompare(a.date)||0);
   const label={ok:'OK',red:'CUIDADO',over:'PRESUPUESTO EXCEDIDO'}[s.st];
   const hint=s.st==='ok'?`Faltan ${money(s.avail-p.threshold)} para llegar al umbral rojo (${money(p.threshold)}).`:s.st==='red'?`Quedan solo ${money(s.avail)}. Umbral: ${money(p.threshold)}.`:`Te pasaste por ${money(-s.avail)}.`;
@@ -132,7 +128,7 @@ function render(){
     <div class="lbl" style="margin-top:6px">${s.pct.toFixed(1)}% gastado</div>
     <p class="hint">${hint}</p>
   </section>
-  ${p.closed?'<div class="lock">🔒 Periodo cerrado. Los gastos están bloqueados.</div>':'<button class="btn" onclick="expForm()">+ Agregar gasto</button>'}
+  ${backupNag()}${p.closed?'<div class="lock">🔒 Periodo cerrado. Los gastos están bloqueados.</div>':'<button class="btn" onclick="expForm()">+ Agregar gasto</button>'}
   <h2>Gastos (${ex.length})</h2>
   <div class="list">${ex.length?ex.map(e=>`<button class="ex" ${p.closed?'disabled':''} onclick="expForm('${e.id}')"><span class="d">${fd(e.date)}</span><span class="m"><b>${esc(e.desc)}</b><span>${esc(e.cat)}${e.note?' · '+esc(e.note):''}</span></span><span class="a">${money(e.amount)}</span></button>`).join(''):'<div class="empty">Sin gastos. Toca “Agregar gasto” para empezar.</div>'}</div>
   <h2>Periodo</h2>
@@ -149,6 +145,10 @@ function setHTML(){
   return`<h2 style="margin-top:20px">Valores para periodos nuevos</h2>
   <label>Presupuesto</label><input id="dB" type="number" inputmode="decimal" value="${S.defaults.budget}" onchange="setDef()">
   <label>Umbral de alerta (rojo cuando quede esto o menos)</label><input id="dT" type="number" inputmode="decimal" value="${S.defaults.threshold}" onchange="setDef()">
+  <h2>Respaldo</h2>
+  <p style="margin:0 4px 10px;color:var(--mute);font-size:14px">${lastBk()}</p>
+  <button class="btn sec" onclick="exportData()">Exportar respaldo</button>
+  ${importBtn()}
   <h2>Datos</h2>
   <p style="margin:0 4px 10px;color:var(--mute);font-size:14px">Todo se guarda solo en este dispositivo (IndexedDB). No se pide información bancaria.</p>
   ${hasSample?'<button class="btn sec del btn del" onclick="delSample()">Eliminar datos de ejemplo</button>':''}
@@ -227,11 +227,41 @@ function delPeriod(id){const p=S.periods.find(x=>x.id===id);
   ask('¿Eliminar "'+p.name+'" y sus '+p.expenses.length+' gastos? No se puede deshacer.',()=>{
   S.periods=S.periods.filter(x=>x.id!==id);S.activeId=S.periods.length?S.periods[S.periods.length-1].id:null;save();render()},'Eliminar')}
 
+
+/* ---------- Respaldo ---------- */
+const getBk=()=>{try{return+localStorage.getItem('lastBackup')||0}catch(e){return 0}};
+function lastBk(){const t=getBk();return t?'Último respaldo: '+fd(iso(new Date(t)),1)+'. Guarda el archivo en iCloud Drive o Archivos.':'Aún no has hecho un respaldo. Guarda el archivo en iCloud Drive o Archivos.'}
+function backupNag(){if(!S.periods.some(p=>p.expenses.length)||Date.now()-getBk()<7*864e5)return'';
+  return'<button class="lock" style="width:100%;text-align:left;margin-bottom:0" onclick="go(\'set\')">💾 Haz un respaldo de tus datos (Ajustes → Respaldo).</button>'}
+function importBtn(){return'<label class="btn sec" style="text-align:center">Importar respaldo<input type="file" accept=".json,application/json" hidden onchange="importData(this)"></label>'}
+async function exportData(){
+  const name='gastos-respaldo-'+today()+'.json',blob=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});
+  const done=()=>{try{localStorage.setItem('lastBackup',Date.now())}catch(e){}render()};
+  try{const f=new File([blob],name,{type:'application/json'});
+    if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f]});return done()}}
+  catch(e){if(e&&e.name==='AbortError')return}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();done();
+}
+function importData(inp){
+  const f=inp.files[0];inp.value='';if(!f)return;
+  f.text().then(t=>{
+    let d;try{d=JSON.parse(t)}catch(e){return alert('El archivo no es un respaldo válido.')}
+    const ok=d&&Array.isArray(d.periods)&&d.periods.every(p=>p&&p.id&&p.name&&p.start&&p.end&&typeof p.budget==='number'&&Array.isArray(p.expenses));
+    if(!ok)return alert('El archivo no es un respaldo válido.');
+    const n=d.periods.length,g=d.periods.reduce((a,p)=>a+p.expenses.length,0);
+    ask('¿Reemplazar los datos actuales con el respaldo? ('+n+' periodos, '+g+' gastos)',()=>{
+      S={activeId:d.activeId,defaults:d.defaults||{budget:40000,threshold:3000},periods:d.periods};
+      if(!S.periods.some(p=>p.id===S.activeId))S.activeId=S.periods.length?S.periods[S.periods.length-1].id:null;
+      save();view='period';render()},'Restaurar');
+  }).catch(()=>alert('No se pudo leer el archivo.'));
+}
+
 /* ---------- PWA: service worker ---------- */
 if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0)addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 
 /* ---------- Inicio ---------- */
 (async()=>{
+  try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
   S=await load();
   if(!S){S=seed();await save()}
   if(!S.periods.some(p=>p.id===S.activeId))S.activeId=S.periods.length?S.periods[S.periods.length-1].id:null;
